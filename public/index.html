@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Delteria Multiplayer - Canvas & WebSocket Sync</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>🎮 Delteria Multiplayer</h1>
+      <div id="statusBadge" class="badge offline">
+        <span class="badge-dot"></span>
+        <span id="statusText">Desconectado</span>
+      </div>
+    </header>
+
+    <!-- Área de Jogo / Canvas HTML5 -->
+    <div class="card game-card">
+      <div class="card-title">
+        <span>Arena de Jogo (Canvas HTML5)</span>
+        <div class="canvas-stats">
+          <span id="playerCoords" class="coord-tag">X: 0 | Y: 0</span>
+          <span id="fpsCounter" class="coord-tag">FPS: --</span>
+        </div>
+      </div>
+      
+      <div class="canvas-wrapper">
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
+      </div>
+
+      <div class="controls-guide">
+        <span class="guide-title">🎮 Controles:</span>
+        <span class="key-badge">W</span>
+        <span class="key-badge">A</span>
+        <span class="key-badge">S</span>
+        <span class="key-badge">D</span>
+        <span style="color: var(--text-muted); font-size: 0.8rem;">ou</span>
+        <span class="key-badge">▲</span>
+        <span class="key-badge">◄</span>
+        <span class="key-badge">▼</span>
+        <span class="key-badge">►</span>
+        <span class="guide-desc">Use as teclas para mover seu quadrado colorido em tempo real!</span>
+      </div>
+    </div>
+
+    <div class="dashboard-grid">
+      <!-- Card Meu Jogador -->
+      <div class="card">
+        <div class="card-title">
+          <span>Meu Jogador</span>
+        </div>
+        <div class="player-identity">
+          <span class="label">ID ÚNICO DO SOCKET</span>
+          <span id="myPlayerId" class="player-id">Conectando...</span>
+        </div>
+        <div class="player-identity">
+          <span class="label">COR ATRIBUÍDA</span>
+          <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <div id="myColorPreview" class="color-preview"></div>
+            <span id="myColorText" style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted);">---</span>
+          </div>
+        </div>
+        <div class="player-identity">
+          <span class="label">STATUS DO SERVIDOR</span>
+          <span id="serverInfo" style="color: var(--text-muted); font-size: 0.85rem;">
+            Aguardando handshake WebSocket...
+          </span>
+        </div>
+      </div>
+
+      <!-- Card Jogadores Conectados -->
+      <div class="card">
+        <div class="card-title">
+          <span>Jogadores Conectados</span>
+          <span id="playerCount" class="count">0</span>
+        </div>
+        <ul id="playersList" class="player-list">
+          <li class="player-item" style="color: var(--text-muted);">Nenhum jogador conectado</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Feed de Eventos / Log de Conexões -->
+    <div class="card">
+      <div class="card-title">
+        <span>Log de Eventos (WebSocket)</span>
+        <span style="font-size: 0.75rem; text-transform: none; color: var(--text-muted);">Tempo real</span>
+      </div>
+      <div id="eventLogs" class="terminal-box">
+        <!-- Logs serão adicionados dinamicamente aqui -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Cliente Socket.io servido automaticamente pelo servidor Node.js -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>

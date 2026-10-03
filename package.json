@@ -1,0 +1,27 @@
+{
+  "name": "graal_navigation_delteria",
+  "version": "1.0.0",
+  "description": "Multiplayer game navigation prototype using Node.js, Express and Socket.io",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node test_multiplayer.js"
+  },
+  "keywords": [
+    "multiplayer",
+    "socket.io",
+    "game",
+    "websocket"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.4"
+  }
+}
