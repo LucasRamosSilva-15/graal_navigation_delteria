@@ -3,31 +3,32 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Delteria Multiplayer - Canvas & WebSocket Sync</title>
+  <title>Delteria Multiplayer - Phaser 3 Top-Down</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="container">
     <header class="header">
-      <h1>🎮 Delteria Multiplayer</h1>
+      <h1>⚔️ Delteria Multiplayer (Phaser 3)</h1>
       <div id="statusBadge" class="badge offline">
         <span class="badge-dot"></span>
         <span id="statusText">Desconectado</span>
       </div>
     </header>
 
-    <!-- Área de Jogo / Canvas HTML5 -->
+    <!-- Área de Jogo Phaser.js -->
     <div class="card game-card">
       <div class="card-title">
-        <span>Arena de Jogo (Canvas HTML5)</span>
+        <span>Mundo Top-Down (Phaser.js)</span>
         <div class="canvas-stats">
           <span id="playerCoords" class="coord-tag">X: 0 | Y: 0</span>
           <span id="fpsCounter" class="coord-tag">FPS: --</span>
         </div>
       </div>
       
+      <!-- Container do jogo Phaser -->
       <div class="canvas-wrapper">
-        <canvas id="gameCanvas" width="800" height="500"></canvas>
+        <div id="gameContainer"></div>
       </div>
 
       <div class="controls-guide">
@@ -41,7 +42,7 @@
         <span class="key-badge">◄</span>
         <span class="key-badge">▼</span>
         <span class="key-badge">►</span>
-        <span class="guide-desc">Use as teclas para mover seu quadrado colorido em tempo real!</span>
+        <span class="guide-desc">A câmera acompanha seu herói permanentemente pelo mapa!</span>
       </div>
     </div>
 
@@ -49,18 +50,17 @@
       <!-- Card Meu Jogador -->
       <div class="card">
         <div class="card-title">
-          <span>Meu Jogador</span>
+          <span>Meu Personagem</span>
         </div>
         <div class="player-identity">
           <span class="label">ID ÚNICO DO SOCKET</span>
           <span id="myPlayerId" class="player-id">Conectando...</span>
         </div>
         <div class="player-identity">
-          <span class="label">COR ATRIBUÍDA</span>
-          <div style="display: flex; align-items: center; gap: 0.6rem;">
-            <div id="myColorPreview" class="color-preview"></div>
-            <span id="myColorText" style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted);">---</span>
-          </div>
+          <span class="label">ESTADO DA CÂMERA</span>
+          <span style="color: var(--accent-cyan); font-family: var(--font-mono); font-size: 0.85rem;">
+            🔒 Travada no Jogador Local (Follow Camera)
+          </span>
         </div>
         <div class="player-identity">
           <span class="label">STATUS DO SERVIDOR</span>
@@ -73,7 +73,7 @@
       <!-- Card Jogadores Conectados -->
       <div class="card">
         <div class="card-title">
-          <span>Jogadores Conectados</span>
+          <span>Jogadores no Mapa</span>
           <span id="playerCount" class="count">0</span>
         </div>
         <ul id="playersList" class="player-list">
@@ -94,7 +94,14 @@
     </div>
   </div>
 
-  <!-- Cliente Socket.io servido automaticamente pelo servidor Node.js -->
+  <!-- Scripts: Phaser 3 + Socket.io + Game Client -->
+  <script src="/libs/phaser/phaser.min.js"></script>
+  <!-- Fallback CDN para Phaser caso o arquivo local não carregue -->
+  <script>
+    if (typeof Phaser === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"><\/script>');
+    }
+  </script>
   <script src="/socket.io/socket.io.js"></script>
   <script src="client.js"></script>
 </body>
