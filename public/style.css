@@ -154,6 +154,43 @@ body {
   image-rendering: crisp-edges;
 }
 
+/* Chat Input Overlay */
+.chat-overlay {
+  position: absolute;
+  bottom: 12px;
+  left: 16px;
+  right: 16px;
+  z-index: 20;
+  display: flex;
+  pointer-events: none;
+}
+
+.chat-input {
+  width: 100%;
+  pointer-events: auto;
+  background: rgba(11, 15, 23, 0.75);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 0.65rem 1rem;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  outline: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.chat-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.chat-input:focus {
+  background: rgba(11, 15, 23, 0.92);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 16px rgba(0, 210, 255, 0.3), 0 4px 20px rgba(0, 0, 0, 0.7);
+}
+
 /* Controls Guide */
 .controls-guide {
   display: flex;
@@ -337,4 +374,8 @@ body {
 
 .log-msg.system {
   color: var(--accent-cyan);
+}
+
+.log-msg.chat {
+  color: #fcd34d;
 }

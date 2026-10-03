@@ -211,6 +211,24 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Evento de Chat Global (Speech Bubbles)
+  socket.on('chat_message', (msg) => {
+    const rawText = typeof msg === 'string' ? msg : (msg && msg.message ? msg.message : '');
+    const cleanText = String(rawText).trim();
+
+    if (!cleanText || cleanText.length === 0) return;
+
+    // Limita tamanho para evitar flood
+    const message = cleanText.substring(0, 100);
+    console.log(`[CHAT] [${playerId}]: ${message}`);
+
+    // Broadcast para todos os clientes conectados (incluindo o remetente)
+    io.emit('chat_message', {
+      id: playerId,
+      message
+    });
+  });
+
   // Evento de desconexão
   socket.on('disconnect', () => {
     players.delete(playerId);

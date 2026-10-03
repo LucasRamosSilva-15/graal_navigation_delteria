@@ -29,6 +29,17 @@
       <!-- Container do jogo Phaser -->
       <div class="canvas-wrapper">
         <div id="gameContainer"></div>
+        <!-- Input de chat sobreposto ao canvas -->
+        <div id="chatOverlay" class="chat-overlay">
+          <input 
+            type="text" 
+            id="chatInput" 
+            class="chat-input" 
+            placeholder="Pressione Enter para falar..." 
+            maxlength="80" 
+            autocomplete="off" 
+          />
+        </div>
       </div>
 
       <div class="controls-guide">
@@ -42,7 +53,9 @@
         <span class="key-badge">◄</span>
         <span class="key-badge">▼</span>
         <span class="key-badge">►</span>
-        <span class="guide-desc">A câmera acompanha seu herói permanentemente pelo mapa!</span>
+        <span style="color: var(--text-muted); font-size: 0.8rem;">|</span>
+        <span class="key-badge">Enter</span>
+        <span class="guide-desc">Pressione Enter para abrir o chat em balão!</span>
       </div>
     </div>
 

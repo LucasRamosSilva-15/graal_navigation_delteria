@@ -12,6 +12,7 @@ const playersListEl = document.getElementById('playersList');
 const eventLogsEl = document.getElementById('eventLogs');
 const playerCoordsEl = document.getElementById('playerCoords');
 const fpsCounterEl = document.getElementById('fpsCounter');
+const chatInput = document.getElementById('chatInput');
 
 let myId = null;
 let currentPlayersData = new Map();
@@ -175,26 +176,44 @@ class GameScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, worldConfig.width, worldConfig.height);
     this.cameras.main.setZoom(1.25);
 
-    // 4. Captura de Teclado
+    // 4. Captura de Teclado (sem interceptar preventDefault para permitir digitação no chat)
     this.cursors = this.input.keyboard.createCursorKeys();
     this.wasd = this.input.keyboard.addKeys({
       up: Phaser.Input.Keyboard.KeyCodes.W,
       down: Phaser.Input.Keyboard.KeyCodes.S,
       left: Phaser.Input.Keyboard.KeyCodes.A,
       right: Phaser.Input.Keyboard.KeyCodes.D
-    });
+    }, false); // false = não chama preventDefault nas teclas W, A, S, D
 
-    this.input.keyboard.addCapture([
-      Phaser.Input.Keyboard.KeyCodes.UP,
-      Phaser.Input.Keyboard.KeyCodes.DOWN,
-      Phaser.Input.Keyboard.KeyCodes.LEFT,
-      Phaser.Input.Keyboard.KeyCodes.RIGHT,
+    // Garante que o Phaser não capture nem bloqueie teclas alfanuméricas e espaço
+    this.input.keyboard.removeCapture([
+      Phaser.Input.Keyboard.KeyCodes.W,
+      Phaser.Input.Keyboard.KeyCodes.A,
+      Phaser.Input.Keyboard.KeyCodes.S,
+      Phaser.Input.Keyboard.KeyCodes.D,
       Phaser.Input.Keyboard.KeyCodes.SPACE
     ]);
 
     // Instancia jogadores já presentes
     currentPlayersData.forEach(playerData => {
       this.addPlayer(playerData);
+    });
+  }
+
+  // Reseta teclas de movimentação e para o jogador imediatamente
+  resetInputKeys() {
+    if (this.localPlayer && this.localPlayer.sprite) {
+      this.localPlayer.isMoving = false;
+      this.localPlayer.sprite.play(`idle-${this.localPlayer.direction}`, true);
+    }
+    this.lastInputSent = { up: false, down: false, left: false, right: false };
+    socket.emit('player_move', {
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+      direction: this.currentDirection,
+      isMoving: false
     });
   }
 
@@ -260,6 +279,7 @@ class GameScene extends Phaser.Scene {
       container,
       sprite,
       nameTag,
+      speechBubble: null,
       targetX: x,
       targetY: y,
       predictedX: x,
@@ -280,9 +300,64 @@ class GameScene extends Phaser.Scene {
     }
   }
 
+  // Exibe balão de fala (Speech Bubble) acima do sprite do jogador
+  showSpeechBubble(id, message) {
+    const entity = this.playerEntities.get(id);
+    if (!entity) return;
+
+    // Destrói balão anterior se existir
+    if (entity.speechBubble) {
+      if (entity.speechBubble.timer) entity.speechBubble.timer.remove();
+      entity.speechBubble.text.destroy();
+      entity.speechBubble = null;
+    }
+
+    // Criação do elemento de texto do Phaser com fonte pixelada e fundo escuro translúcido
+    const bubbleText = this.add.text(entity.container.x, entity.container.y - 44, message, {
+      fontFamily: 'monospace',
+      fontSize: '11px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+      backgroundColor: 'rgba(7, 10, 15, 0.85)',
+      align: 'center',
+      padding: { x: 8, y: 5 },
+      wordWrap: { width: 170, useAdvancedWrap: true }
+    });
+
+    bubbleText.setOrigin(0.5, 1);
+    bubbleText.setDepth(100); // Garante visibilidade sobre o mapa e jogadores
+    bubbleText.setStroke('rgba(0, 210, 255, 0.65)', 1);
+
+    // Timer de 5 segundos para destruição automática
+    const timer = this.time.delayedCall(5000, () => {
+      if (entity.speechBubble && entity.speechBubble.text === bubbleText) {
+        this.tweens.add({
+          targets: bubbleText,
+          alpha: 0,
+          duration: 300,
+          onComplete: () => {
+            bubbleText.destroy();
+            if (entity.speechBubble && entity.speechBubble.text === bubbleText) {
+              entity.speechBubble = null;
+            }
+          }
+        });
+      }
+    });
+
+    entity.speechBubble = {
+      text: bubbleText,
+      timer
+    };
+  }
+
   removePlayer(id) {
     const entity = this.playerEntities.get(id);
     if (entity) {
+      if (entity.speechBubble) {
+        if (entity.speechBubble.timer) entity.speechBubble.timer.remove();
+        entity.speechBubble.text.destroy();
+      }
       entity.container.destroy();
       this.playerEntities.delete(id);
     }
@@ -304,7 +379,6 @@ class GameScene extends Phaser.Scene {
       }
     } else {
       // Reconciliação autoritativa do servidor
-      // Se a discrepância for muito grande (tentativa de atravessar parede ou teleporte), corrige
       const dist = Phaser.Math.Distance.Between(entity.container.x, entity.container.y, x, y);
       if (dist > 30) {
         entity.container.x = x;
@@ -320,8 +394,10 @@ class GameScene extends Phaser.Scene {
       fpsCounterEl.textContent = `FPS: ${Math.round(this.game.loop.actualFps)}`;
     }
 
-    // Processamento do jogador local
-    if (this.localPlayer && this.localPlayer.container) {
+    // Processamento do jogador local apenas se o teclado estiver ativo (input de chat não focado)
+    const isInputFocused = document.activeElement === chatInput;
+
+    if (this.localPlayer && this.localPlayer.container && !isInputFocused) {
       const up = this.cursors.up.isDown || this.wasd.up.isDown;
       const down = this.cursors.down.isDown || this.wasd.down.isDown;
       const left = this.cursors.left.isDown || this.wasd.left.isDown;
@@ -343,7 +419,6 @@ class GameScene extends Phaser.Scene {
       }
 
       // FEEDBACK VISUAL IMEDIATO COM COLISÃO LOCAL:
-      // Testa movimento em X e Y separadamente (wall slide)
       const speed = worldConfig.speed || 5;
       let moveDx = 0;
       let moveDy = 0;
@@ -394,9 +469,16 @@ class GameScene extends Phaser.Scene {
 
     // Interpolação suave dos outros jogadores
     this.playerEntities.forEach((entity, id) => {
-      if (entity.isMe) return;
-      entity.container.x = Phaser.Math.Linear(entity.container.x, entity.targetX, 0.3);
-      entity.container.y = Phaser.Math.Linear(entity.container.y, entity.targetY, 0.3);
+      if (!entity.isMe) {
+        entity.container.x = Phaser.Math.Linear(entity.container.x, entity.targetX, 0.3);
+        entity.container.y = Phaser.Math.Linear(entity.container.y, entity.targetY, 0.3);
+      }
+
+      // ANCORAGEM: Atualiza a posição (X e Y) do balão de fala para acompanhar o jogador a cada frame
+      if (entity.speechBubble && entity.speechBubble.text && entity.speechBubble.text.active) {
+        entity.speechBubble.text.x = entity.container.x;
+        entity.speechBubble.text.y = entity.container.y - 44;
+      }
     });
   }
 }
@@ -421,6 +503,75 @@ const phaserConfig = {
 const game = new Phaser.Game(phaserConfig);
 
 // ==========================================
+// CONTROLE DO CHAT INPUT (UI & FOCO)
+// ==========================================
+
+// Prevenção de scroll pelas setas/espaço durante o jogo e atalho de Enter
+window.addEventListener('keydown', (e) => {
+  // Evita scroll da página durante o jogo APENAS se o chat não estiver com foco
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+    if (document.activeElement !== chatInput) {
+      e.preventDefault();
+    }
+  }
+
+  // Pressionar Enter no jogo abre e foca o campo de chat
+  if (e.key === 'Enter') {
+    if (document.activeElement !== chatInput) {
+      e.preventDefault();
+      chatInput.focus();
+    }
+  }
+});
+
+// Enquanto o input estiver focado, desativa a captura global de teclas do Phaser
+chatInput.addEventListener('focus', () => {
+  if (activeGameScene && activeGameScene.input && activeGameScene.input.keyboard) {
+    activeGameScene.input.keyboard.enabled = false;
+    activeGameScene.resetInputKeys();
+  }
+});
+
+// Ao perder o foco, reativa a captura de teclas do Phaser
+chatInput.addEventListener('blur', () => {
+  if (activeGameScene && activeGameScene.input && activeGameScene.input.keyboard) {
+    activeGameScene.input.keyboard.enabled = true;
+    activeGameScene.resetInputKeys();
+  }
+});
+
+// Isola completamente os eventos de teclado dentro do chatInput (permite W, A, S, D, etc.)
+chatInput.addEventListener('keydown', (e) => {
+  // Impede que o evento suba para o Phaser ou para os listeners de window do jogo
+  e.stopPropagation();
+
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const message = chatInput.value.trim();
+
+    if (message.length > 0) {
+      // Envia o texto digitado através do evento chat_message
+      socket.emit('chat_message', { message });
+    }
+
+    chatInput.value = '';
+    chatInput.blur();
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    chatInput.value = '';
+    chatInput.blur();
+  }
+});
+
+chatInput.addEventListener('keyup', (e) => {
+  e.stopPropagation();
+});
+
+chatInput.addEventListener('keypress', (e) => {
+  e.stopPropagation();
+});
+
+// ==========================================
 // EVENTOS SOCKET.IO
 // ==========================================
 socket.on('connect', () => {
@@ -430,7 +581,7 @@ socket.on('connect', () => {
   statusBadge.className = 'badge online';
   statusText.textContent = 'Online';
   myPlayerIdEl.textContent = myId;
-  serverInfoEl.textContent = 'Conectado (Tiled Map & Colisão Autoritativa)';
+  serverInfoEl.textContent = 'Conectado (Phaser 3 & Chat Speech Bubbles)';
 
   appendScreenLog(`Conectado como [${myId}]`, 'system');
 });
@@ -483,6 +634,21 @@ socket.on('player_moved', (data) => {
   if (activeGameScene) {
     activeGameScene.updatePlayerPosition(data.id, data.x, data.y, data.direction, data.isMoving);
   }
+});
+
+// Recebe broadcast de mensagem de chat
+socket.on('chat_message', (data) => {
+  console.log(`[CHAT] [${data.id}]: ${data.message}`);
+
+  // Exibe o balão de fala sobre o sprite do jogador no Phaser
+  if (activeGameScene) {
+    activeGameScene.showSpeechBubble(data.id, data.message);
+  }
+
+  // Registra no feed de log da interface
+  const isMe = data.id === myId;
+  const senderLabel = isMe ? 'VOCÊ' : data.id.substring(0, 6);
+  appendScreenLog(`💬 [${senderLabel}]: ${data.message}`, 'chat');
 });
 
 socket.on('player_left', (data) => {

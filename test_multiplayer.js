@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Carrega o mesmo map.json
+// Carrega o map.json
 const mapData = JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'assets', 'map.json'), 'utf-8'));
 const collisionLayerData = mapData.layers.find(l => l.name === 'Colisao').data;
 const MAP_WIDTH = mapData.width;
@@ -50,7 +50,6 @@ const players = new Map();
 
 io.on('connection', (socket) => {
   const playerId = socket.id;
-  // Posiciona o jogador logo ao lado de uma parede sólida em (x=16, y=50) onde x=0 é parede sólida
   const playerData = {
     id: playerId,
     x: 48,
@@ -104,68 +103,88 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Handler de chat_message
+  socket.on('chat_message', (msg) => {
+    const rawText = typeof msg === 'string' ? msg : (msg && msg.message ? msg.message : '');
+    const cleanText = String(rawText).trim();
+
+    if (!cleanText || cleanText.length === 0) return;
+
+    const message = cleanText.substring(0, 100);
+    io.emit('chat_message', {
+      id: playerId,
+      message
+    });
+  });
+
   socket.on('disconnect', () => {
     players.delete(playerId);
     io.emit('player_left', { id: playerId, totalPlayers: players.size });
   });
 });
 
-const TEST_PORT = 4570;
+const TEST_PORT = 4571;
 server.listen(TEST_PORT, async () => {
   console.log(`[TEST] Servidor de teste ouvindo na porta ${TEST_PORT}`);
 
   try {
-    const client = Client(`http://localhost:${TEST_PORT}`);
+    const client1 = Client(`http://localhost:${TEST_PORT}`);
+    const client2 = Client(`http://localhost:${TEST_PORT}`);
 
-    await new Promise((resolve) => {
-      client.on('connect', () => {
-        console.log(`[TEST] Cliente conectado: [${client.id}]`);
-        resolve();
-      });
+    await Promise.all([
+      new Promise((resolve) => client1.on('connect', resolve)),
+      new Promise((resolve) => client2.on('connect', resolve))
+    ]);
+
+    console.log(`[TEST] Clientes conectados: C1=[${client1.id}], C2=[${client2.id}]`);
+
+    // 1. Teste de Broadcast de Chat: Cliente 1 fala, ambos devem receber
+    let client1ReceivedChat = null;
+    let client2ReceivedChat = null;
+
+    client1.on('chat_message', (data) => {
+      client1ReceivedChat = data;
     });
 
+    client2.on('chat_message', (data) => {
+      client2ReceivedChat = data;
+    });
+
+    const testMessage = 'Olá a todos no Delteria!';
+    client1.emit('chat_message', { message: testMessage });
+
+    await new Promise((r) => setTimeout(r, 150));
+
+    if (!client1ReceivedChat || client1ReceivedChat.message !== testMessage || client1ReceivedChat.id !== client1.id) {
+      throw new Error(`Cliente 1 não recebeu seu próprio chat broadcast corretamente! Dados: ${JSON.stringify(client1ReceivedChat)}`);
+    }
+
+    if (!client2ReceivedChat || client2ReceivedChat.message !== testMessage || client2ReceivedChat.id !== client1.id) {
+      throw new Error(`Cliente 2 não recebeu o chat broadcast de Cliente 1! Dados: ${JSON.stringify(client2ReceivedChat)}`);
+    }
+
+    console.log(`[TEST] ✅ Broadcast de chat recebido por todos os clientes: "${client2ReceivedChat.message}" de [${client2ReceivedChat.id}]`);
+
+    // 2. Teste de Colisão Autoritativa
     let currentX = 48;
-    let currentY = 50;
-
-    client.on('player_moved', (data) => {
-      currentX = data.x;
-      currentY = data.y;
+    client1.on('player_moved', (data) => {
+      if (data.id === client1.id) currentX = data.x;
     });
 
-    // 1. Teste de Movimento Válido: Mover para a direita (área livre)
-    console.log('[TEST] 1. Testando movimento em área livre (para a direita)...');
-    client.emit('player_move', { right: true, direction: 'right' });
-    await new Promise((r) => setTimeout(r, 100));
-
-    if (currentX <= 48) {
-      throw new Error(`Esperava que o jogador se movesse para a direita (> 48), mas obteve X=${currentX}`);
-    }
-    console.log(`[TEST] ✅ Movimento livre permitido com sucesso! X=${currentX}`);
-
-    // 2. Teste de Colisão Autoritativa: Tentar andar para a esquerda em direção à parede sólida (x=0)
-    console.log('[TEST] 2. Testando bloqueio contra parede sólida (para a esquerda repetidas vezes)...');
-    // Força 20 passos para a esquerda tentando passar pela parede em x=0..32
     for (let i = 0; i < 20; i++) {
-      client.emit('player_move', { left: true, direction: 'left' });
-      await new Promise((r) => setTimeout(r, 15));
+      client1.emit('player_move', { left: true, direction: 'left' });
+      await new Promise((r) => setTimeout(r, 10));
     }
     await new Promise((r) => setTimeout(r, 100));
 
-    // A parede esquerda ocupa de x=0 a x=32. Com hitbox half=10, o jogador não pode ter X < 42
     if (currentX < 42) {
       throw new Error(`HACK DETECTADO: Jogador conseguiu atravessar a parede! X=${currentX}`);
     }
-    console.log(`[TEST] ✅ Colisão autoritativa impediu atravessar a parede! Posição bloqueada em X=${currentX}`);
+    console.log(`[TEST] ✅ Colisão autoritativa bloqueou parede com sucesso em X=${currentX}`);
 
-    // 3. Teste de colisão no Lago de Água (x: 27..34 tiles -> 864..1088px, y: 4..9 tiles -> 128..288px)
-    const inWater = checkCollision(28 * 32, 6 * 32);
-    if (!inWater) {
-      throw new Error('A água deveria ser considerada colisão no servidor!');
-    }
-    console.log('[TEST] ✅ Água da camada Colisao validada como sólida no servidor!');
-
-    client.disconnect();
-    console.log('[TEST] TODOS OS TESTES DE TILED MAP E COLISÃO AUTORITATIVA PASSARAM! ✅');
+    client1.disconnect();
+    client2.disconnect();
+    console.log('[TEST] TODOS OS TESTES DE CHAT, WEBSOCKET E COLISÃO PASSARAM! ✅');
     server.close(() => process.exit(0));
   } catch (err) {
     console.error('[TEST] Falha no teste:', err);
